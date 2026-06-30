@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- title, creator, publisher, lang, width, height, #items1, #items2, #itemref -->
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" xml:lang="zh-TW" unique-identifier="bw-ecode" prefix="rendition: http://www.idpf.org/vocab/rendition/# ebpaj: http://www.ebpaj.jp/ fixed-layout-jp: http://www.digital-comic.jp/ kadokawa: http://www.kadokawa.co.jp/ access: http://www.access-company.com/2012/layout# ibooks: http://vocabulary.itunes.apple.com/rdf/ibooks/vocabulary-extensions-1.0/">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title id="title">[title]</dc:title>
+ <meta refines="#title" property="file-as">[title]</meta>
+   <dc:creator id="creator01">[creator]</dc:creator>
+   <meta refines="#creator01" property="role" scheme="marc:relators">aut</meta>
+   <meta refines="#creator01" property="file-as">[creator]</meta>
+   <meta refines="#creator01" property="display-seq">0</meta>
+ <dc:publisher id="publisher">[publisher]</dc:publisher>
+   <dc:language id="language">[lang]</dc:language>
+   <dc:identifier id="unique-id">000000</dc:identifier>
+   <dc:identifier id="bw-ecode">000000</dc:identifier>
+   <meta property="dcterms:modified">2025-05-06T18:51:17Z</meta>
+   <meta property="rendition:layout">pre-paginated</meta>
+   <meta property="rendition:spread">landscape</meta>
+  <meta property="rendition:orientation">auto</meta>
+   <meta property="ebpaj:guide-version">1.1.2</meta>
+   <meta property="kadokawa:version">1.0.1</meta>
+ <meta property="ibooks:specified-fonts">true</meta>
+ <meta property="ibooks:binding">false</meta>
+ <meta name="book-type" content="comic"/>
+ <meta name="original-resolution" content="722x1024"/>
+ <meta name="orientation-lock" content="none"/>
+ <meta name="cover" content="cover"/>
+ <meta property="fixed-layout-jp:viewport">width=[width], height=[height]</meta>
+ <meta name="bookmarkSign" content="g42124346" /></metadata>
+  <manifest>
+   <item media-type="application/xhtml+xml" id="toc" href="nav.xhtml" properties="nav"/>
+   <item media-type="text/css" id="fixed-layout-jp" href="style/fixed-layout-jp.css"/>
+<item media-type="text/css" id="book-style"      href="style/book-style.css"/>
+<item media-type="text/css" id="style-reset"     href="style/style-reset.css"/>
+<item media-type="text/css" id="style-standard"  href="style/style-standard.css"/>
+<item media-type="text/css" id="style-advance"   href="style/style-advance.css"/>
+<item media-type="text/css" id="style-check"     href="style/style-check.css"/>
+   <item media-type="image/jpeg" id="cover" href="image/i-001.jpeg" properties="cover-image"/>
+    [items1]
+
+    <!-- <item id="i-001" href="image/i-000.jpeg" media-type="image/jpeg"/> -->
+    
+   <item media-type="application/xhtml+xml" id="p-cover" href="xhtml/p-cover.xhtml" properties="svg" fallback="cover"/>
+    [items2]
+
+    <!--> <item media-type="application/xhtml+xml" id="p-002" href="xhtml/p-002.xhtml" properties="svg" fallback="i-002"/> -->
+
+</manifest>
+<spine toc="ncxtoc" page-progression-direction="rtl">
+<itemref linear="yes" idref="p-cover" properties="rendition:page-spread-center"/>
+    [itemref]
+    <!-- <itemref idref="p-002" linear="yes" properties="page-spread-left"/> -->
+    <!-- <itemref idref="p-003" linear="yes" properties="page-spread-right"/> -->
+  </spine>
+</package>

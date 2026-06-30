@@ -1,0 +1,128 @@
+@charset "UTF-8";
+@import "style-reset.css";
+@import "style-standard.css";
+@import "style-advance.css";
+
+.hltr h1,
+.hltr h2,
+.hltr h3,
+.hltr h4,
+.hltr h5,
+.hltr h6 {
+  font-family: serif-ja, serif;
+}
+
+.vrtl h1,
+.vrtl h2,
+.vrtl h3,
+.vrtl h4,
+.vrtl h5,
+.vrtl h6 {
+  font-family: serif-ja-v, serif-ja, serif;
+}
+
+.hltr a {
+}
+.vrtl a {
+}
+
+a:link {
+}
+
+a:visited {
+}
+
+a:hover {
+}
+
+a:focus {
+}
+
+a:active {
+}
+
+.hltr a.cyu {
+}
+.vrtl a.cyu {
+}
+
+a.cyu:link {
+}
+
+a.cyu:visited {
+}
+
+a.cyu:hover {
+}
+
+a.cyu:focus {
+}
+
+a.cyu:active {
+}
+
+.hltr .tobira-midashi {
+}
+.vrtl .tobira-midashi {
+}
+
+.hltr .oo-midashi {
+}
+.vrtl .oo-midashi {
+}
+
+.hltr .naka-midashi {
+}
+.vrtl .naka-midashi {
+}
+
+.hltr .ko-midashi {
+}
+.vrtl .ko-midashi {
+}
+
+body.p-cover {
+  margin:     0;
+  padding:    0;
+  text-align: center;
+}
+body.p-cover .main {
+}
+
+body.p-image {
+  margin:     0;
+  padding:    0;
+  text-align: center;
+}
+body.p-image .main {
+}
+
+body.p-text {
+}
+body.p-text .main {
+}
+
+body.p-titlepage {
+}
+body.p-titlepage .main {
+}
+
+body.p-colophon {
+}
+body.p-colophon .main {
+}
+
+body.p-toc {
+}
+body.p-toc .main {
+}
+
+body.p-caution {
+}
+body.p-caution .main {
+}
+
+body.p-ad {
+}
+body.p-ad .main {
+}

@@ -1,0 +1,60 @@
+@charset "UTF-8";
+
+a ruby {
+  vertical-align: bottom;
+}
+
+span.key,
+span.ref {
+  display: inline-block;
+}
+
+.indent-0em  .key, .h-indent-0em  .key, .indent-0em  .ref, .h-indent-0em  .ref,
+.indent-1em  .key, .h-indent-1em  .key, .indent-1em  .ref, .h-indent-1em  .ref,
+.indent-2em  .key, .h-indent-2em  .key, .indent-2em  .ref, .h-indent-2em  .ref,
+.indent-3em  .key, .h-indent-3em  .key, .indent-3em  .ref, .h-indent-3em  .ref,
+.indent-4em  .key, .h-indent-4em  .key, .indent-4em  .ref, .h-indent-4em  .ref,
+.indent-5em  .key, .h-indent-5em  .key, .indent-5em  .ref, .h-indent-5em  .ref,
+.indent-6em  .key, .h-indent-6em  .key, .indent-6em  .ref, .h-indent-6em  .ref,
+.indent-7em  .key, .h-indent-7em  .key, .indent-7em  .ref, .h-indent-7em  .ref,
+.indent-8em  .key, .h-indent-8em  .key, .indent-8em  .ref, .h-indent-8em  .ref,
+.indent-9em  .key, .h-indent-9em  .key, .indent-9em  .ref, .h-indent-9em  .ref,
+.indent-10em .key, .h-indent-10em .key, .indent-10em .ref, .h-indent-10em .ref {
+  text-indent: 0;
+}
+
+@font-face {
+  font-family: "serif-ja";
+  src: local("ＭＳ 明朝");
+}
+@font-face {
+  font-family: "sans-serif-ja";
+  src: local("ＭＳ ゴシック");
+}
+
+@font-face {
+  font-family: "serif-ja-v";
+  src: local("@ＭＳ 明朝");
+}
+@font-face {
+  font-family: "sans-serif-ja-v";
+  src: local("@ＭＳ ゴシック");
+}
+
+.hltr { font-family: serif-ja, serif; }
+.vrtl { font-family: serif-ja-v, serif-ja, serif; }
+
+.vrtl .hltr { font-family: serif-ja, serif; }
+.hltr .vrtl { font-family: serif-ja-v, serif-ja, serif; }
+
+.hltr .mfont { font-family: serif-ja, serif; }
+.hltr .gfont { font-family: sans-serif-ja, sans-serif;}
+
+.vrtl .mfont { font-family: serif-ja-v, serif-ja, serif; }
+.vrtl .gfont { font-family: sans-serif-ja-v, sans-serif-ja, sans-serif; }
+
+.vrtl .hltr .mfont { font-family: serif-ja, serif; }
+.vrtl .hltr .gfont { font-family: sans-serif-ja, sans-serif; }
+
+.hltr .vrtl .mfont { font-family: serif-ja-v, serif-ja, serif; }
+.hltr .vrtl .gfont { font-family: sans-serif-ja-v, sans-serif-ja, sans-serif; }
