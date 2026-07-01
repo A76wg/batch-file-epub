@@ -129,13 +129,22 @@ def build_epub(
     return dst
 
 
-def pack_epub(src_dir: str | Path, output_epub: str | Path) -> Path:
+def pack_epub(src_dir: str | Path, output_epub: str | Path,
+               no_compress: bool = False) -> Path:
     """Zip *src_dir* into an .epub file at *output_epub*.
-    Uses STORED (no compression) for images — they're already compressed."""
+    If *no_compress* is True, all files are stored without compression."""
     import zipfile
     src_dir = Path(src_dir)
     output_epub = Path(output_epub)
     output_epub.parent.mkdir(parents=True, exist_ok=True)
+
+    if no_compress:
+        # Pure container — no compression, 1:1 file sizes
+        compress_all = zipfile.ZIP_STORED
+        compress_img = zipfile.ZIP_STORED
+    else:
+        compress_all = zipfile.ZIP_DEFLATED
+        compress_img = zipfile.ZIP_STORED
 
     with zipfile.ZipFile(output_epub, "w", zipfile.ZIP_DEFLATED) as zf:
         # mimetype must be first, uncompressed
@@ -145,11 +154,11 @@ def pack_epub(src_dir: str | Path, output_epub: str | Path) -> Path:
         for f in sorted(src_dir.rglob("*")):
             if f.is_file() and f.name != "mimetype":
                 arcname = f.relative_to(src_dir).as_posix()
-                # Image files are already compressed (webp/jpg) — store as-is
-                compress = zipfile.ZIP_DEFLATED
+                # Images are already compressed — store as-is
                 if f.parent.name == "image" and f.suffix.lower() in (".jpeg", ".jpg", ".png", ".webp"):
-                    compress = zipfile.ZIP_STORED
-                zf.write(f, arcname, compress)
+                    zf.write(f, arcname, compress_img)
+                else:
+                    zf.write(f, arcname, compress_all)
     logger.info("Packed → %s", output_epub)
     return output_epub
 
@@ -371,6 +380,8 @@ Examples:
                     help="Left-to-right page progression (western comics, webtoons)")
     ap.add_argument("--pack", default=None, const="__AUTO__", nargs="?", metavar="PATH",
                     help="Zip --dst into an .epub. Defaults to <dst>.epub if no PATH given")
+    ap.add_argument("--no-compress", action="store_true",
+                    help="Store all files without compression (1:1 size, zero bloat)")
     ap.add_argument("--no-chapters", action="store_true",
                     help="Disable auto-detection of chapters from subdirectories")
     ap.add_argument("--chapters", default=None, metavar="JSON",
@@ -405,7 +416,7 @@ Examples:
     if args.pack:
         pack_stem = args.pack if args.pack != "__AUTO__" else Path(args.dst).name.rstrip("/\\")
         pack_path = str(Path(args.dst).resolve() / f"{pack_stem}.epub")
-        pack_epub(out_dir, pack_path)
+        pack_epub(out_dir, pack_path, no_compress=args.no_compress)
         print(pack_path)
 
 
