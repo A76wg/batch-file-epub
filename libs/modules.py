@@ -108,17 +108,18 @@ def count_tree_images(tree: ChapterTree) -> int:
 def convert_and_copy_images(src_images: list[Path], dst_dir: Path,
                             normalize: bool = False,
                             ratio_tolerance: float = 0.03,
-                            jpeg_quality: int = 92) -> int:
+                            encode_quality: int = 85) -> int:
     """Copy/convert images to *dst_dir* as JPEG, named i-001.jpeg … i-NNN.jpeg.
 
     If *normalize* is True, images are first normalized to a consistent canvas
     size (majority-ratio images → average size; outliers → fitted within canvas).
+    Resized images keep their original format (webp→webp, jpg→jpg).
 
     Returns number of images processed.
     """
     dst_dir.mkdir(parents=True, exist_ok=True)
     if normalize:
-        _normalize_images(src_images, dst_dir, ratio_tolerance, jpeg_quality)
+        _normalize_images(src_images, dst_dir, ratio_tolerance, encode_quality)
         return len(src_images)
     for idx, src in enumerate(src_images, start=1):
         page_n = f"{idx:03d}"
@@ -138,7 +139,7 @@ def _to_jpeg(src: Path, dst: Path) -> None:
 
 def _normalize_images(src_images: list[Path], dst_dir: Path,
                       ratio_tolerance: float = 0.03,
-                      jpeg_quality: int = 92) -> None:
+                      encode_quality: int = 85) -> None:
     """Normalize image sizes for consistent EPUB output.
 
     1. Scan all images for dimensions & aspect ratios (via imagesize).
@@ -193,11 +194,11 @@ def _normalize_images(src_images: list[Path], dst_dir: Path,
             # Already perfect — 假转 (copy + rename, no re-encode)
             shutil.copy2(src, dst)
         elif not is_outlier:
-            # Majority ratio but wrong size → resize to canvas
-            _resize_to_fit(src, dst, canvas_w, canvas_h, jpeg_quality)
+            # Majority ratio but wrong size → resize, keep original format
+            _resize_to_fit(src, dst, canvas_w, canvas_h, encode_quality)
         else:
-            # Outlier → scale to fit within canvas, center on white background
-            _resize_to_fit_letterbox(src, dst, canvas_w, canvas_h, jpeg_quality)
+            # Outlier → scale to fit within canvas, centered on white background
+            _resize_to_fit_letterbox(src, dst, canvas_w, canvas_h, encode_quality)
 
     # ── 5. Write summary ──
     summary = {
@@ -218,18 +219,38 @@ def _normalize_images(src_images: list[Path], dst_dir: Path,
     logger.info("Normalization summary → %s", summary_path)
 
 
+def _save_resized(img, dst: Path, src_format: str, quality: int) -> None:
+    """Save *img* to *dst* in *src_format* with appropriate quality settings."""
+    fmt = src_format.upper()
+    if fmt == "WEBP":
+        img.save(dst, "WEBP", quality=quality)
+    elif fmt in ("JPEG", "JPG"):
+        img.save(dst, "JPEG", quality=quality, optimize=True)
+    elif fmt == "PNG":
+        img.save(dst, "PNG", optimize=True)
+    else:
+        img.save(dst, "JPEG", quality=quality)
+
+
+def _detect_format(src: Path) -> str:
+    """Detect image format from file extension (e.g. 'webp', 'jpg', 'png')."""
+    return src.suffix.lstrip(".").lower()
+
+
 def _resize_to_fit(src: Path, dst: Path, tw: int, th: int, quality: int) -> None:
-    """Resize *src* to exactly *tw*×*th*, preserving content via LANCZOS."""
+    """Resize *src* to exactly *tw*×*th*, preserving original format."""
     from PIL import Image
+    src_fmt = _detect_format(src)
     img = Image.open(src).convert("RGB")
     img = img.resize((tw, th), Image.LANCZOS)
-    img.save(dst, "JPEG", quality=quality)
+    _save_resized(img, dst, src_fmt, quality)
 
 
 def _resize_to_fit_letterbox(src: Path, dst: Path, canvas_w: int, canvas_h: int,
                               quality: int) -> None:
     """Scale *src* to fit within *canvas_w*×*canvas_h* (keep ratio), center on white."""
     from PIL import Image
+    src_fmt = _detect_format(src)
     img = Image.open(src).convert("RGB")
     ow, oh = img.size
     scale = min(canvas_w / ow, canvas_h / oh)
@@ -240,7 +261,7 @@ def _resize_to_fit_letterbox(src: Path, dst: Path, canvas_w: int, canvas_h: int,
     x = (canvas_w - new_w) // 2
     y = (canvas_h - new_h) // 2
     canvas.paste(img_resized, (x, y))
-    canvas.save(dst, "JPEG", quality=quality)
+    _save_resized(canvas, dst, src_fmt, quality)
 
 
 # ═══════════════════════════════════════════

@@ -46,7 +46,7 @@ def build_epub(
     no_chapters: bool = False,
     chapters: dict[str, int] | None = None,
     normalize: bool = False,
-    jpeg_quality: int = 92,
+    encode_quality: int = 85,
 ) -> Path:
     """Build a fixed-layout EPUB3 from images in *src* and write to *dst*.
 
@@ -73,8 +73,8 @@ def build_epub(
         Disable auto-detection of chapters from subdirectories.
     normalize : bool
         Normalize image sizes to consistent canvas (majority → average, outliers → letterbox).
-    jpeg_quality : int
-        JPEG quality for resized images (1-100, default 92).  Lower = smaller files.
+    encode_quality : int
+        Quality for resized images (1-100).  Lower = smaller files.  Preserves source format.
 
     Returns
     -------
@@ -106,7 +106,7 @@ def build_epub(
     # ── 1. Collect & convert images ──
     images = collect_images(src)
     image_dst = dst / "item" / "image"
-    total = convert_and_copy_images(images, image_dst, normalize=normalize, jpeg_quality=jpeg_quality)
+    total = convert_and_copy_images(images, image_dst, normalize=normalize, encode_quality=encode_quality)
     page_sizes, max_w, max_h = get_image_sizes(image_dst)
     logger.info("Images: %d  max size: %dx%d", total, max_w, max_h)
 
@@ -372,8 +372,8 @@ Examples:
                     help='Chapter map as JSON: \'{"第1话":1,"第2话":25}\' or path to a .json file')
     ap.add_argument("--normalize", action="store_true",
                     help="Normalize image sizes: majority → average canvas, outliers → letterboxed")
-    ap.add_argument("--jpg-quality", type=int, default=92, metavar="1-100",
-                    help="JPEG quality when resizing (default: 92, lower = smaller file)")
+    ap.add_argument("--jpg-quality", type=int, dest="quality", default=85, metavar="1-100",
+                    help="Quality for resized images (default: 85, lower = smaller file). Preserves source format.")
     ap.add_argument("--quiet", action="store_true", help="Suppress info logs")
     args = ap.parse_args(argv)
 
@@ -395,7 +395,7 @@ Examples:
         no_chapters=args.no_chapters,
         chapters=chapters_dict,
         normalize=args.normalize,
-        jpeg_quality=args.jpg_quality,
+        encode_quality=args.quality,
     )
     if args.pack:
         pack_stem = args.pack if args.pack != "__AUTO__" else Path(args.dst).name.rstrip("/\\")
