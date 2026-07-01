@@ -73,6 +73,28 @@ pack_epub(out, "/path/to/output.epub")
 | `--rtl` | on | Right-to-left (manga) |
 | `--ltr` | — | Left-to-right (western) |
 | `--chapters` | — | JSON string or .json file path |
+| `--normalize` | — | Normalize image sizes to consistent canvas |
+| `--quality` | `85` | Encoding quality 1-100, only for resized images |
+
+## Normalization (`--normalize`)
+
+When enabled, images are scanned with `imagesize` and normalized to a consistent canvas:
+
+1. **Detect dominant aspect ratio** — groups images with similar ratios (±3% tolerance)
+2. **Majority images** → resize to median dimensions (already-correct images are copied as-is)
+3. **Outliers** → scale to fit within canvas, centered with white letterbox
+
+Resized images **keep their original format** (webp→webp, jpg→jpg).
+
+```bash
+# Normalize with default quality (85)
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --normalize --pack
+
+# Lower quality = smaller output
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --normalize --quality 70 --pack
+```
+
+Without `--normalize`, images are copied as-is with renamed extensions — no re-encoding, no size change.
 
 ## Supported Input Formats
 
