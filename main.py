@@ -45,7 +45,7 @@ def build_epub(
     rtl: bool = True,
     no_chapters: bool = False,
     chapters: dict[str, int] | None = None,
-    normalize: bool = False,
+    normalize: bool = True,
     encode_quality: int = 85,
 ) -> Path:
     """Build a fixed-layout EPUB3 from images in *src* and write to *dst*.
@@ -72,7 +72,9 @@ def build_epub(
     no_chapters : bool
         Disable auto-detection of chapters from subdirectories.
     normalize : bool
-        Normalize image sizes to consistent canvas (majority → average, outliers → letterbox).
+        Normalise all images to a common canvas (median dimensions) with
+        aspect-ratio-preserving letterboxing.  Eliminates blank space from
+        inconsistent image sizes.
     encode_quality : int
         Quality for resized images (1-100).  Lower = smaller files.  Preserves source format.
 
@@ -130,12 +132,12 @@ def build_epub(
 
 
 def pack_epub(src_dir: str | Path, output_epub: str | Path,
-               no_compress: bool = False) -> Path:
+               no_compress: bool = True) -> Path:
     """Zip *src_dir* into an .epub file at *output_epub*.
     If *no_compress* is True, all files are stored without compression."""
     import zipfile
-    src_dir = Path(src_dir)
-    output_epub = Path(output_epub)
+    src_dir = Path(src_dir).resolve()
+    output_epub = Path(output_epub).resolve()
     output_epub.parent.mkdir(parents=True, exist_ok=True)
 
     if no_compress:
@@ -146,13 +148,22 @@ def pack_epub(src_dir: str | Path, output_epub: str | Path,
         compress_all = zipfile.ZIP_DEFLATED
         compress_img = zipfile.ZIP_STORED
 
-    with zipfile.ZipFile(output_epub, "w", zipfile.ZIP_DEFLATED) as zf:
+    # Determine the default compression for ZipFile (used only for files
+    # where zf.write() is called without an explicit compress_type).
+    default_compress = compress_all
+
+    with zipfile.ZipFile(output_epub, "w", default_compress) as zf:
         # mimetype must be first, uncompressed
         mimetype = src_dir / "mimetype"
         if mimetype.exists():
             zf.write(mimetype, "mimetype", zipfile.ZIP_STORED)
         for f in sorted(src_dir.rglob("*")):
             if f.is_file() and f.name != "mimetype":
+                # ⚠  Skip the output .epub itself — it lives inside src_dir
+                #    and would otherwise be recursively included on re-runs,
+                #    causing exponential size bloat.
+                if f.resolve() == output_epub:
+                    continue
                 arcname = f.relative_to(src_dir).as_posix()
                 # Images are already compressed — store as-is
                 if f.parent.name == "image" and f.suffix.lower() in (".jpeg", ".jpg", ".png", ".webp"):
@@ -224,20 +235,22 @@ def _write_pages(
     xhtml_dir = dst / "item" / "xhtml"
     xhtml_dir.mkdir(parents=True, exist_ok=True)
 
-    # Cover page (image 001)
+    # Cover page (image 001) — use its own dimensions so it fills the page
+    cover_w, cover_h = page_sizes.get(1, (max_w, max_h))
     cover_html = replace_placeholders(section_tpl, {
-        "width": str(max_w), "height": str(max_h),
-        "width_this": str(max_w), "height_this": str(max_h),
+        "width": str(cover_w), "height": str(cover_h),
+        "width_this": str(cover_w), "height_this": str(cover_h),
         "page_n": "001", "page": "cover",
     })
     (xhtml_dir / "p-cover.xhtml").write_text(cover_html, encoding="utf-8")
 
-    # Content pages
+    # Content pages — each page uses its own image dimensions as viewport,
+    # so the image fills the entire screen without blank space.
     for idx in range(1, total + 1):
         page_n = page_number_str(idx)
         w, h = page_sizes.get(idx, (max_w, max_h))
         html = replace_placeholders(section_tpl, {
-            "width": str(max_w), "height": str(max_h),
+            "width": str(w), "height": str(h),
             "width_this": str(w), "height_this": str(h),
             "page_n": page_n, "page": str(idx),
         })
@@ -380,14 +393,14 @@ Examples:
                     help="Left-to-right page progression (western comics, webtoons)")
     ap.add_argument("--pack", default=None, const="__AUTO__", nargs="?", metavar="PATH",
                     help="Zip --dst into an .epub. Defaults to <dst>.epub if no PATH given")
-    ap.add_argument("--no-compress", action="store_true",
-                    help="Store all files without compression (1:1 size, zero bloat)")
+    ap.add_argument("--compress", action="store_false", dest="no_compress", default=True,
+                    help="Enable ZIP compression (smaller file, slower packing)")
     ap.add_argument("--no-chapters", action="store_true",
                     help="Disable auto-detection of chapters from subdirectories")
     ap.add_argument("--chapters", default=None, metavar="JSON",
                     help='Chapter map as JSON: \'{"第1话":1,"第2话":25}\' or path to a .json file')
-    ap.add_argument("--normalize", action="store_true",
-                    help="Normalize image sizes: majority → average canvas, outliers → letterboxed")
+    ap.add_argument("--no-normalize", action="store_false", dest="normalize", default=True,
+                    help="Skip image normalization (keep original sizes)")
     ap.add_argument("--jpg-quality", type=int, dest="quality", default=85, metavar="1-100",
                     help="Quality for resized images (default: 85, lower = smaller file). Preserves source format.")
     ap.add_argument("--quiet", action="store_true", help="Suppress info logs")

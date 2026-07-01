@@ -1,22 +1,26 @@
 # batch-file-epub
 
-Convert a folder of manga/comic images into a fixed-layout EPUB3 optimized for Apple Books (iBooks).
+Convert a folder of manga / comic images into a fixed-layout EPUB3 optimised for Apple Books (iBooks).
 
 ## Features
 
 - **Fixed-layout EPUB3** — pixel-perfect image rendering with SVG-wrapped pages
-- 電書協 CSS templates for full iBooks compatibility
+- **Per-page viewport** — every page uses its own image dimensions, so each image fills the screen edge-to-edge with zero blank space
+- **Automatic image normalisation** — all images are scaled (aspect-ratio preserved) to a common median canvas with centred letterboxing; **enabled by default**
+- **No compression by default** — images stored as-is for fastest packing; optional ZIP deflate via `--compress`
 - **Chapter TOC** — flat or nested, auto-detected from subdirectories or explicit JSON
 - **RTL / LTR** page progression (manga vs western comics)
 - **CLI + Python API** — shell-friendly and agent-importable
+- 電書協 CSS templates for full iBooks compatibility
 
 ## Requirements
 
 - Python 3.9+
-- imagesize
+- [Pillow](https://pypi.org/project/Pillow/) (only needed when `--no-normalize` is used without normalisation; always required for letterboxing)
+- [imagesize](https://pypi.org/project/imagesize/)
 
 ```bash
-pip install imagesize
+pip install pillow imagesize
 ```
 
 ## Usage
@@ -24,16 +28,19 @@ pip install imagesize
 ### CLI
 
 ```bash
-# Basic conversion with auto-pack
+# Basic — normalisation on, no compression (fastest)
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack
 
-# --pack defaults to <dst>.epub if no path given
-python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack
+# With compression (smaller .epub, slower to pack)
+python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack --compress
+
+# Skip normalisation (keep original image dimensions untouched)
+python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack --no-normalize
 
 # Explicit pack path
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack ./manga.epub
 
-# With chapters (JSON)
+# With chapters (inline JSON)
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh \
     --chapters '{"Ch.1":1,"Ch.2":25}' --pack
 
@@ -41,11 +48,15 @@ python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh \
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh \
     --chapters chapters.json --pack
 
-# Auto-detect chapters from folder structure (flat or nested)
-python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack
-
 # Left-to-right (western comics / webtoons)
 python main.py --src ./images/ --dst ./out/ --title "Webtoon" --lang ko --ltr --pack
+
+# Lower re-encode quality = smaller output (only affects normalised images)
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --jpg-quality 70 --pack
+
+# Disable chapter auto-detection
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --no-chapters --pack
+```
 
 ### Python API
 
@@ -57,6 +68,7 @@ out = build_epub(
     dst="/tmp/epub-out",
     title="My Manga",
     lang="zh",
+)
 pack_epub(out, "/path/to/output.epub")
 ```
 
@@ -69,51 +81,73 @@ pack_epub(out, "/path/to/output.epub")
 | `--title` | (required) | Book title |
 | `--author` | `""` | Author / creator |
 | `--publisher` | `""` | Publisher |
-| `--lang` | `ja` | Language code |
-| `--rtl` | on | Right-to-left (manga) |
-| `--ltr` | — | Left-to-right (western) |
-| `--chapters` | — | JSON string or .json file path |
-| `--normalize` | — | Normalize image sizes to consistent canvas |
-| `--quality` | `85` | Encoding quality 1-100, only for resized images |
+| `--lang` | `"ja"` | Language code (e.g. `ja`, `zh`, `en`, `ko`) |
+| `--rtl` | on | Right-to-left page progression (manga, default) |
+| `--ltr` | — | Left-to-right page progression (western comics, webtoons) |
+| `--pack` | — | Zip output into `.epub`; defaults to `<dst>/<dst-dirname>.epub` |
+| `--compress` | off | Enable ZIP deflate compression (smaller file, slower packing) |
+| `--no-normalize` | off | Skip image normalisation (keep original pixel dimensions) |
+| `--no-chapters` | off | Disable chapter auto-detection from subdirectories |
+| `--chapters` | — | Chapter map as inline JSON `'{"Name":page}'` or `.json` file path |
+| `--jpg-quality` | `85` | Re-encoding quality 1–100 (only applies when normalisation resizes an image) |
+| `--quiet` | off | Suppress info-level log output |
 
-## Normalization (`--normalize`)
+## Normalisation (default: on)
 
-When enabled, images are scanned with `imagesize` and normalized to a consistent canvas:
+Normalisation is **enabled by default** and works as follows:
 
-1. **Detect dominant aspect ratio** — groups images with similar ratios (±3% tolerance)
-2. **Majority images** → resize to median dimensions (already-correct images are copied as-is)
-3. **Outliers** → scale to fit within canvas, centered with white letterbox
+1. All images are scanned with `imagesize` to collect their physical dimensions.
+2. The **median width and height** across all images become the target canvas.
+3. Every image is **scaled** (preserving aspect ratio) to fit within this canvas.
+4. Images that don't fill the canvas exactly are **centred on a white background** (letterboxed).
 
-Resized images **keep their original format** (webp→webp, jpg→jpg).
+This guarantees that every page has the **same viewport size**, no image overflows the screen, and blank space is minimised — even when the source images have wildly different dimensions.
+
+Images that already match the canvas are copied as-is (no re-encode). Others are re-encoded in their **original format** (webp → webp, jpg → jpg) at the specified `--jpg-quality`.
 
 ```bash
-# Normalize with default quality (85)
-python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --normalize --pack
+# Normalisation is on by default — just don't pass --no-normalize
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --pack
 
-# Lower quality = smaller output
-python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --normalize --quality 70 --pack
+# Tweak quality
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --jpg-quality 70 --pack
+
+# Keep original sizes untouched
+python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --no-normalize --pack
 ```
 
-Without `--normalize`, images are copied as-is with renamed extensions — no re-encoding, no size change.
+## Per-Page Viewport Sizing
+
+Without `--no-normalize`, each page's XHTML sets its SVG `viewBox` to the **image's own pixel dimensions** rather than a global maximum. This means:
+
+- Every image fills the entire screen edge-to-edge.
+- No blank space from a single oversized image stretching all viewports.
+- Pages may have slightly different viewport sizes — the reader (Apple Books) handles this seamlessly with fixed-layout rendering.
+
+## Packing & Compression
+
+By default, `pack_epub` stores all files **without compression** (`ZIP_STORED`), making the `.epub` practically the same size as the source directory and very fast to produce. Pass `--compress` to enable `ZIP_DEFLATED` for a smaller file at the cost of packing time.
+
+The packer also **skips the output `.epub` file itself** if it already exists inside the source directory, preventing recursive inclusion that could balloon file size on repeated runs.
 
 ## Supported Input Formats
 
-jpg, jpeg, png, webp, bmp, gif, tiff. Images are naturally sorted by filename (1 < 2 < 10 < 20) and copied as-is (extension renamed to .jpeg, no re-encoding).
+`jpg`, `jpeg`, `png`, `webp`, `bmp`, `gif`, `tiff`, `tif`. Images are naturally sorted by filename (1 < 2 < 10 < 20) before processing.
 
 ## Chapter TOC
 
-Chapters are detected in order of priority:
+Chapters are generated in order of priority:
 
-1. **`--chapters`** — Explicit JSON map or `.json` file
+1. **`--chapters`** — Explicit JSON map or `.json` file path
 2. **Auto-detect from folders** — Subdirectories become chapters:
    - **Flat**: `src/Ch01/*.png` → single-level TOC
    - **Nested**: `src/Vol.1/Ch01/*.png` → hierarchical TOC
-   - **Mixed**: loose images at root level become a "Front Matter" section
+   - **Mixed**: loose images at root level become a *Front Matter* section
 3. **`--no-chapters`** — Skip TOC entirely
 
 ## CSS Templates
 
-Originate from 電書協 EPUB 3 制作ガイド (ver.1.1.1) by the Japan Electronic Book Publishers Association (日本電子書籍出版社協会). Extracted from commercially published fixed-layout manga EPUBs where they are used for iBooks rendering compatibility.
+The bundled CSS originates from 電書協 EPUB 3 制作ガイド (ver.1.1.1) by the Japan Electronic Book Publishers Association (日本電子書籍出版社協会). Extracted from commercially published fixed-layout manga EPUBs for iBooks rendering compatibility.
 
 Modify with caution.
 

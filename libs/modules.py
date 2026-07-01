@@ -111,9 +111,9 @@ def convert_and_copy_images(src_images: list[Path], dst_dir: Path,
                             encode_quality: int = 85) -> int:
     """Copy/convert images to *dst_dir* as JPEG, named i-001.jpeg … i-NNN.jpeg.
 
-    If *normalize* is True, images are first normalized to a consistent canvas
-    size (majority-ratio images → average size; outliers → fitted within canvas).
-    Resized images keep their original format (webp→webp, jpg→jpg).
+    If *normalize* is True, all images are scaled (preserving aspect ratio) to
+    fit within a common canvas (median dimensions), centred with letterboxing.
+    This gives every page a consistent viewport size with no overflow.
 
     Returns number of images processed.
     """
@@ -142,12 +142,11 @@ def _normalize_images(src_images: list[Path], dst_dir: Path,
                       encode_quality: int = 85) -> None:
     """Normalize image sizes for consistent EPUB output.
 
-    1. Scan all images for dimensions & aspect ratios (via imagesize).
-    2. Find the dominant aspect ratio (most common, within *ratio_tolerance*).
-    3. Majority-ratio images → resize all to the median dimensions.
-    4. Aspect-ratio outliers → scale to fit within the canvas, centered (letterboxed).
-
-    All output is JPEG (re-encoded when resized, copy+rename when unchanged).
+    All images are scaled (preserving aspect ratio) to fit within a common
+    canvas derived from the median dimensions of all images.  Images that
+    don't match the canvas exactly are centred on a white background
+    (letterboxed).  This ensures every page has the same viewport size and
+    no image overflows or leaves excessive blank space.
     """
     import imagesize
 
@@ -158,59 +157,39 @@ def _normalize_images(src_images: list[Path], dst_dir: Path,
     img_meta: list[dict] = []
     for src in src_images:
         w, h = imagesize.get(str(src))
-        ratio = w / h
-        img_meta.append({"src": src, "w": w, "h": h, "ratio": ratio})
+        img_meta.append({"src": src, "w": w, "h": h})
 
-    # ── 2. Find dominant ratio ──
-    # Group ratios into buckets by tolerance
-    ratio_buckets: dict[float, list[dict]] = {}
-    for m in img_meta:
-        bucket = round(m["ratio"] / ratio_tolerance) * ratio_tolerance
-        ratio_buckets.setdefault(bucket, []).append(m)
-    dominant_bucket = max(ratio_buckets, key=lambda k: len(ratio_buckets[k]))
-    majority = ratio_buckets[dominant_bucket]
-    outliers = [m for m in img_meta if round(m["ratio"] / ratio_tolerance) * ratio_tolerance != dominant_bucket]
-
-    # ── 3. Calculate target canvas for majority ──
-    # Use median of majority dimensions
-    sorted_w = sorted(m["w"] for m in majority)
-    sorted_h = sorted(m["h"] for m in majority)
+    # ── 2. Calculate target canvas from median of ALL dimensions ──
+    sorted_w = sorted(m["w"] for m in img_meta)
+    sorted_h = sorted(m["h"] for m in img_meta)
     n = len(sorted_w)
     canvas_w = sorted_w[n // 2]
     canvas_h = sorted_h[n // 2]
 
-    logger.info("Normalize: %d majority (%.4f) → %dx%d, %d outliers",
-                len(majority), dominant_bucket, canvas_w, canvas_h, len(outliers))
+    logger.info("Normalize: %d images → %dx%d canvas (median)",
+                len(img_meta), canvas_w, canvas_h)
 
-    # ── 4. Process ──
+    # ── 3. Process every image with letterbox scaling (preserve aspect ratio) ──
     for idx, m in enumerate(img_meta, start=1):
         page_n = f"{idx:03d}"
         dst = dst_dir / f"i-{page_n}.jpeg"
         src = m["src"]
         w, h = m["w"], m["h"]
-        is_outlier = m in outliers
 
-        if not is_outlier and w == canvas_w and h == canvas_h:
-            # Already perfect — 假转 (copy + rename, no re-encode)
+        if w == canvas_w and h == canvas_h:
+            # Already matches canvas — fast-path copy
             shutil.copy2(src, dst)
-        elif not is_outlier:
-            # Majority ratio but wrong size → resize, keep original format
-            _resize_to_fit(src, dst, canvas_w, canvas_h, encode_quality)
         else:
-            # Outlier → scale to fit within canvas, centered on white background
+            # Scale to fit within canvas, centred on white background
             _resize_to_fit_letterbox(src, dst, canvas_w, canvas_h, encode_quality)
 
-    # ── 5. Write summary ──
+    # ── 4. Write summary ──
     summary = {
         "total": len(img_meta),
-        "majority_ratio": round(dominant_bucket, 4),
-        "majority_count": len(majority),
-        "outlier_count": len(outliers),
         "canvas": f"{canvas_w}x{canvas_h}",
-        "outliers": [
-            {"name": m["src"].name, "original": f"{m['w']}x{m['h']}",
-             "ratio": round(m["ratio"], 4)}
-            for m in outliers
+        "images": [
+            {"name": m["src"].name, "original": f"{m['w']}x{m['h']}"}
+            for m in img_meta
         ],
     }
     summary_path = dst_dir / "_normalize_summary.json"
@@ -235,15 +214,6 @@ def _save_resized(img, dst: Path, src_format: str, quality: int) -> None:
 def _detect_format(src: Path) -> str:
     """Detect image format from file extension (e.g. 'webp', 'jpg', 'png')."""
     return src.suffix.lstrip(".").lower()
-
-
-def _resize_to_fit(src: Path, dst: Path, tw: int, th: int, quality: int) -> None:
-    """Resize *src* to exactly *tw*×*th*, preserving original format."""
-    from PIL import Image
-    src_fmt = _detect_format(src)
-    img = Image.open(src).convert("RGB")
-    img = img.resize((tw, th), Image.LANCZOS)
-    _save_resized(img, dst, src_fmt, quality)
 
 
 def _resize_to_fit_letterbox(src: Path, dst: Path, canvas_w: int, canvas_h: int,
