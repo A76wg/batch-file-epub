@@ -130,7 +130,8 @@ def build_epub(
 
 
 def pack_epub(src_dir: str | Path, output_epub: str | Path) -> Path:
-    """Zip *src_dir* into an .epub file at *output_epub*."""
+    """Zip *src_dir* into an .epub file at *output_epub*.
+    Uses STORED (no compression) for images — they're already compressed."""
     import zipfile
     src_dir = Path(src_dir)
     output_epub = Path(output_epub)
@@ -144,7 +145,11 @@ def pack_epub(src_dir: str | Path, output_epub: str | Path) -> Path:
         for f in sorted(src_dir.rglob("*")):
             if f.is_file() and f.name != "mimetype":
                 arcname = f.relative_to(src_dir).as_posix()
-                zf.write(f, arcname, zipfile.ZIP_DEFLATED)
+                # Image files are already compressed (webp/jpg) — store as-is
+                compress = zipfile.ZIP_DEFLATED
+                if f.parent.name == "image" and f.suffix.lower() in (".jpeg", ".jpg", ".png", ".webp"):
+                    compress = zipfile.ZIP_STORED
+                zf.write(f, arcname, compress)
     logger.info("Packed → %s", output_epub)
     return output_epub
 
