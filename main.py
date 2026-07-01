@@ -45,6 +45,7 @@ def build_epub(
     rtl: bool = True,
     no_chapters: bool = False,
     chapters: dict[str, int] | None = None,
+    normalize: bool = False,
 ) -> Path:
     """Build a fixed-layout EPUB3 from images in *src* and write to *dst*.
 
@@ -69,6 +70,8 @@ def build_epub(
         Explicit chapter map: ``{"Name": start_page, ...}``.  Overrides auto-detection.
     no_chapters : bool
         Disable auto-detection of chapters from subdirectories.
+    normalize : bool
+        Normalize image sizes to consistent canvas (majority → average, outliers → letterbox).
 
     Returns
     -------
@@ -100,7 +103,7 @@ def build_epub(
     # ── 1. Collect & convert images ──
     images = collect_images(src)
     image_dst = dst / "item" / "image"
-    total = convert_and_copy_images(images, image_dst)
+    total = convert_and_copy_images(images, image_dst, normalize=normalize)
     page_sizes, max_w, max_h = get_image_sizes(image_dst)
     logger.info("Images: %d  max size: %dx%d", total, max_w, max_h)
 
@@ -364,6 +367,8 @@ Examples:
                     help="Disable auto-detection of chapters from subdirectories")
     ap.add_argument("--chapters", default=None, metavar="JSON",
                     help='Chapter map as JSON: \'{"第1话":1,"第2话":25}\' or path to a .json file')
+    ap.add_argument("--normalize", action="store_true",
+                    help="Normalize image sizes: majority → average canvas, outliers → letterboxed")
     ap.add_argument("--quiet", action="store_true", help="Suppress info logs")
     args = ap.parse_args(argv)
 
@@ -384,6 +389,7 @@ Examples:
         rtl=args.rtl,
         no_chapters=args.no_chapters,
         chapters=chapters_dict,
+        normalize=args.normalize,
     )
     if args.pack:
         pack_stem = args.pack if args.pack != "__AUTO__" else Path(args.dst).name.rstrip("/\\")
