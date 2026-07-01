@@ -76,7 +76,7 @@ pack_epub(out, "/path/to/output.epub")
 
 ## Supported Input Formats
 
-jpg, jpeg, png, webp, bmp, gif, tiff. Images are naturally sorted by filename (1 < 2 < 10 < 20) and converted to JPEG (quality 92).
+jpg, jpeg, png, webp, bmp, gif, tiff. Images are naturally sorted by filename (1 < 2 < 10 < 20) and copied as-is (extension renamed to .jpeg, no re-encoding).
 
 ## Chapter TOC
 
