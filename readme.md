@@ -151,6 +151,45 @@ The bundled CSS originates from 電書協 EPUB 3 制作ガイド (ver.1.1.1) by 
 
 Modify with caution.
 
+## GUI (tkinter)
+
+A graphical front-end is provided in `coverter-gui.py`. It wraps `main.py`'s API with a
+user-friendly interface — no command-line knowledge required.
+
+```bash
+python coverter-gui.py
+```
+
+### GUI Features
+
+| Section | Controls |
+|---------|----------|
+| **Input / Output** | Browse buttons for source image folder and output directory |
+| **Metadata** | Title, Author, Publisher text fields; Language dropdown (ja, zh, en, ko, …) |
+| **Page Progression** | Radio buttons: Right-to-Left (manga) / Left-to-Right (western) |
+| **Image Processing** | Normalisation toggle (on by default); Re-encode quality slider (1–100) |
+| **Chapters** | Three-mode selector: **Custom table** (add/remove chapter→page rows, auto-generates JSON), **Auto-detect** (subdirectories), or **No chapters** |
+| **EPUB Packing** | Pack to `.epub` toggle; ZIP compression toggle; optional output filename |
+| **Log** | Real-time coloured log output showing build progress and any errors |
+
+### GUI Workflow
+
+1. Select your **source folder** containing images (and optionally chapter subdirectories).
+2. Choose an **output folder** where the EPUB structure will be written.
+3. Fill in the **title** (required) and optionally author, publisher, language.
+4. Choose **RTL (manga)** or **LTR (western)** page progression.
+5. Toggle **normalisation** and adjust **quality** as needed.
+6. Choose a **chapter mode** (default: custom table):
+   - **Custom table** — click **＋ Add Row** and enter chapter name + start page; repeat for each chapter. The JSON is generated automatically.
+   - **Auto-detect** — chapters are derived from subdirectory structure automatically.
+   - **No chapters** — all images are treated as a single continuous sequence.
+7. Enable **pack to .epub** if you want the final compressed file.
+8. Click **🚀 Build EPUB** and watch the log for progress.
+9. When complete, the `.epub` file will be in the output folder.
+
+> **Note:** The build runs in a background thread so the GUI stays responsive. You
+> can scroll the log while it works.
+
 ## License
 
 MIT
