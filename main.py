@@ -72,7 +72,7 @@ def build_epub(
     no_chapters : bool
         Disable auto-detection of chapters from subdirectories.
     normalize : bool
-        Normalise all images to a common canvas (median dimensions) with
+        Normalize all images to a common canvas (median dimensions) with
         aspect-ratio-preserving letterboxing.  Eliminates blank space from
         inconsistent image sizes.
     encode_quality : int
@@ -132,20 +132,21 @@ def build_epub(
 
 
 def pack_epub(src_dir: str | Path, output_epub: str | Path,
-               no_compress: bool = True) -> Path:
+               compress: bool = False) -> Path:
     """Zip *src_dir* into an .epub file at *output_epub*.
-    If *no_compress* is True, all files are stored without compression."""
+    If *compress* is False (default), files are stored without compression
+    for fastest packing. Set to True for smaller output."""
     import zipfile
     src_dir = Path(src_dir).resolve()
     output_epub = Path(output_epub).resolve()
     output_epub.parent.mkdir(parents=True, exist_ok=True)
 
-    if no_compress:
-        # Pure container — no compression, 1:1 file sizes
-        compress_all = zipfile.ZIP_STORED
+    if compress:
+        compress_all = zipfile.ZIP_DEFLATED
         compress_img = zipfile.ZIP_STORED
     else:
-        compress_all = zipfile.ZIP_DEFLATED
+        # Pure container — no compression, 1:1 file sizes
+        compress_all = zipfile.ZIP_STORED
         compress_img = zipfile.ZIP_STORED
 
     # Determine the default compression for ZipFile (used only for files
@@ -393,8 +394,8 @@ Examples:
                     help="Left-to-right page progression (western comics, webtoons)")
     ap.add_argument("--pack", default=None, const="__AUTO__", nargs="?", metavar="PATH",
                     help="Zip --dst into an .epub. Defaults to <dst>.epub if no PATH given")
-    ap.add_argument("--compress", action="store_false", dest="no_compress", default=True,
-                    help="Enable ZIP compression (smaller file, slower packing)")
+    ap.add_argument("--compress", action="store_true", default=False,
+                    help="Enable ZIP deflate compression (smaller file, slower packing)")
     ap.add_argument("--no-chapters", action="store_true",
                     help="Disable auto-detection of chapters from subdirectories")
     ap.add_argument("--chapters", default=None, metavar="JSON",
@@ -429,7 +430,7 @@ Examples:
     if args.pack:
         pack_stem = args.pack if args.pack != "__AUTO__" else Path(args.dst).name.rstrip("/\\")
         pack_path = str(Path(args.dst).resolve() / f"{pack_stem}.epub")
-        pack_epub(out_dir, pack_path, no_compress=args.no_compress)
+        pack_epub(out_dir, pack_path, compress=args.compress)
         print(pack_path)
 
 

@@ -6,7 +6,7 @@ Convert a folder of manga / comic images into a fixed-layout EPUB3 optimised for
 
 - **Fixed-layout EPUB3** — pixel-perfect image rendering with SVG-wrapped pages
 - **Per-page viewport** — every page uses its own image dimensions, so each image fills the screen edge-to-edge with zero blank space
-- **Automatic image normalisation** — all images are scaled (aspect-ratio preserved) to a common median canvas with centred letterboxing; **enabled by default**
+- **Automatic image normalization** — all images are scaled (aspect-ratio preserved) to a common median canvas with centred letterboxing; **enabled by default**
 - **No compression by default** — images stored as-is for fastest packing; optional ZIP deflate via `--compress`
 - **Chapter TOC** — flat or nested, auto-detected from subdirectories or explicit JSON
 - **RTL / LTR** page progression (manga vs western comics)
@@ -16,11 +16,11 @@ Convert a folder of manga / comic images into a fixed-layout EPUB3 optimised for
 ## Requirements
 
 - Python 3.9+
-- [Pillow](https://pypi.org/project/Pillow/) (only needed when `--no-normalize` is used without normalisation; always required for letterboxing)
-- [imagesize](https://pypi.org/project/imagesize/)
+- [Pillow](https://pypi.org/project/Pillow/) — image format conversion & normalization
+- [imagesize](https://pypi.org/project/imagesize/) — fast dimension detection
 
 ```bash
-pip install pillow imagesize
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -28,13 +28,13 @@ pip install pillow imagesize
 ### CLI
 
 ```bash
-# Basic — normalisation on, no compression (fastest)
+# Basic — normalization on, no compression (fastest)
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack
 
 # With compression (smaller .epub, slower to pack)
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack --compress
 
-# Skip normalisation (keep original image dimensions untouched)
+# Skip normalization (keep original image dimensions untouched)
 python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh --pack --no-normalize
 
 # Explicit pack path
@@ -51,7 +51,7 @@ python main.py --src ./images/ --dst ./out/ --title "My Manga" --lang zh \
 # Left-to-right (western comics / webtoons)
 python main.py --src ./images/ --dst ./out/ --title "Webtoon" --lang ko --ltr --pack
 
-# Lower re-encode quality = smaller output (only affects normalised images)
+# Lower re-encode quality = smaller output (only affects normalized images)
 python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --jpg-quality 70 --pack
 
 # Disable chapter auto-detection
@@ -85,16 +85,16 @@ pack_epub(out, "/path/to/output.epub")
 | `--rtl` | on | Right-to-left page progression (manga, default) |
 | `--ltr` | — | Left-to-right page progression (western comics, webtoons) |
 | `--pack` | — | Zip output into `.epub`; defaults to `<dst>/<dst-dirname>.epub` |
-| `--compress` | off | Enable ZIP deflate compression (smaller file, slower packing) |
-| `--no-normalize` | off | Skip image normalisation (keep original pixel dimensions) |
+| `--compress` | off | Enable ZIP deflate compression (smaller file, slower packing). New default: no compression (fastest) |
+| `--no-normalize` | off | Skip image normalization (keep original pixel dimensions) |
 | `--no-chapters` | off | Disable chapter auto-detection from subdirectories |
 | `--chapters` | — | Chapter map as inline JSON `'{"Name":page}'` or `.json` file path |
-| `--jpg-quality` | `85` | Re-encoding quality 1–100 (only applies when normalisation resizes an image) |
+| `--jpg-quality` | `85` | Re-encoding quality 1–100 (only applies when normalization resizes an image) |
 | `--quiet` | off | Suppress info-level log output |
 
-## Normalisation (default: on)
+## Normalization (default: on)
 
-Normalisation is **enabled by default** and works as follows:
+Normalization is **enabled by default** and works as follows:
 
 1. All images are scanned with `imagesize` to collect their physical dimensions.
 2. The **median width and height** across all images become the target canvas.
@@ -105,8 +105,11 @@ This guarantees that every page has the **same viewport size**, no image overflo
 
 Images that already match the canvas are copied as-is (no re-encode). Others are re-encoded in their **original format** (webp → webp, jpg → jpg) at the specified `--jpg-quality`.
 
+> **Note:** When `--no-normalize` is used, images are still converted to true JPEG via
+> Pillow to ensure format consistency inside the EPUB (no misleading extensions).
+
 ```bash
-# Normalisation is on by default — just don't pass --no-normalize
+# Normalization is on by default — just don't pass --no-normalize
 python main.py --src ./images/ --dst ./out/ --title "Manga" --lang zh --pack
 
 # Tweak quality
@@ -126,7 +129,7 @@ Without `--no-normalize`, each page's XHTML sets its SVG `viewBox` to the **imag
 
 ## Packing & Compression
 
-By default, `pack_epub` stores all files **without compression** (`ZIP_STORED`), making the `.epub` practically the same size as the source directory and very fast to produce. Pass `--compress` to enable `ZIP_DEFLATED` for a smaller file at the cost of packing time.
+By default, `pack_epub(compress=False)` stores all files **without compression** (`ZIP_STORED`), making the `.epub` practically the same size as the source directory and very fast to produce. Pass `--compress` (or `compress=True`) to enable `ZIP_DEFLATED` for a smaller file at the cost of packing time.
 
 The packer also **skips the output `.epub` file itself** if it already exists inside the source directory, preventing recursive inclusion that could balloon file size on repeated runs.
 
@@ -153,11 +156,11 @@ Modify with caution.
 
 ## GUI (tkinter)
 
-A graphical front-end is provided in `coverter-gui.py`. It wraps `main.py`'s API with a
+A graphical front-end is provided in `converter-gui.py`. It wraps `main.py`'s API with a
 user-friendly interface — no command-line knowledge required.
 
 ```bash
-python coverter-gui.py
+python converter-gui.py
 ```
 
 ### GUI Features
@@ -167,10 +170,15 @@ python coverter-gui.py
 | **Input / Output** | Browse buttons for source image folder and output directory |
 | **Metadata** | Title, Author, Publisher text fields; Language dropdown (ja, zh, en, ko, …) |
 | **Page Progression** | Radio buttons: Right-to-Left (manga) / Left-to-Right (western) |
-| **Image Processing** | Normalisation toggle (on by default); Re-encode quality slider (1–100) |
-| **Chapters** | Three-mode selector: **Custom table** (add/remove chapter→page rows, auto-generates JSON), **Auto-detect** (subdirectories), or **No chapters** |
+| **Image Processing** | Normalization toggle (on by default); Re-encode quality slider (1–100) |
+| **Chapters** | Three-mode selector: **Custom table** (add/remove chapter→page rows, **Import JSON**, auto-generates JSON), **Auto-detect** (subdirectories), or **No chapters** |
 | **EPUB Packing** | Pack to `.epub` toggle; ZIP compression toggle; optional output filename |
+| **Progress** | Animated progress bar with status label during the build |
 | **Log** | Real-time coloured log output showing build progress and any errors |
+
+> **💡 Settings persistence:** All fields (paths, metadata, options, chapter table) are
+> automatically saved to `.converter_gui_settings.json` when you close the GUI and
+> restored on next launch.
 
 ### GUI Workflow
 
@@ -178,17 +186,18 @@ python coverter-gui.py
 2. Choose an **output folder** where the EPUB structure will be written.
 3. Fill in the **title** (required) and optionally author, publisher, language.
 4. Choose **RTL (manga)** or **LTR (western)** page progression.
-5. Toggle **normalisation** and adjust **quality** as needed.
+5. Toggle **normalization** and adjust **quality** as needed.
 6. Choose a **chapter mode** (default: custom table):
-   - **Custom table** — click **＋ Add Row** and enter chapter name + start page; repeat for each chapter. The JSON is generated automatically.
+   - **Custom table** — click **＋ Add Row** and enter chapter name + start page; repeat for each chapter. The JSON is generated automatically. You can also click **📂 Import JSON** to load from a `.json` file.
    - **Auto-detect** — chapters are derived from subdirectory structure automatically.
    - **No chapters** — all images are treated as a single continuous sequence.
 7. Enable **pack to .epub** if you want the final compressed file.
-8. Click **🚀 Build EPUB** and watch the log for progress.
+8. Click **🚀 Build EPUB** and watch the log for progress. An animated progress bar shows when the build is running.
 9. When complete, the `.epub` file will be in the output folder.
 
 > **Note:** The build runs in a background thread so the GUI stays responsive. You
-> can scroll the log while it works.
+> can scroll the log while it works. All settings are saved automatically when you
+> close the GUI and restored on next launch.
 
 ## License
 

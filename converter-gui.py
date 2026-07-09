@@ -2,7 +2,7 @@
 """batch-file-epub GUI — tkinter front-end for main.py API.
 
 Run:
-    python coverter-gui.py
+    python converter-gui.py
 """
 from __future__ import annotations
 
@@ -109,6 +109,8 @@ class EpubBuilderGUI(tk.Tk):
     WINDOW_SIZE = "720x760"
     LANGUAGES = ["ja", "zh", "en", "ko", "de", "fr", "es", "it", "pt", "ru"]
 
+    SETTINGS_FILE = Path(__file__).resolve().parent / ".converter_gui_settings.json"
+
     def __init__(self):
         super().__init__()
         self.title(self.WINDOW_TITLE)
@@ -120,6 +122,7 @@ class EpubBuilderGUI(tk.Tk):
         self._running = False
 
         self._build_ui()
+        self._load_settings()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ─────────────────────────────────────────
@@ -277,6 +280,12 @@ class EpubBuilderGUI(tk.Tk):
                                                           padx=(0, 4))
         ttk.Button(tbtn_f, text="Clear All",
                    command=self._clear_chapter_table).pack(side=tk.LEFT)
+        ttk.Separator(tbtn_f, orient=tk.VERTICAL).pack(side=tk.LEFT,
+                                                        fill=tk.Y,
+                                                        padx=6, pady=2)
+        ttk.Button(tbtn_f, text="📂 Import JSON",
+                   command=self._import_chapter_json).pack(side=tk.LEFT,
+                                                           padx=(0, 4))
 
         # JSON preview
         ttk.Label(self._ch_custom_frame,
@@ -335,9 +344,21 @@ class EpubBuilderGUI(tk.Tk):
         self.pack_name_entry.grid(row=3, column=0, columnspan=2, sticky="ew",
                                   pady=2)
 
+        # ─── Section: Progress ───
+        sec_progress = ttk.LabelFrame(f, text="Progress", padding=6)
+        sec_progress.grid(row=6, column=0, columnspan=3, sticky="ew",
+                          padx=10, pady=4)
+        sec_progress.columnconfigure(0, weight=1)
+        self.progress_bar = ttk.Progressbar(sec_progress, mode="indeterminate",
+                                             length=400)
+        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=4, pady=2)
+        self.progress_label = ttk.Label(sec_progress, text="Ready",
+                                        foreground="#888888")
+        self.progress_label.grid(row=1, column=0, sticky="w", padx=4, pady=(0, 2))
+
         # ─── Section: Actions ───
         sec_actions = ttk.Frame(f)
-        sec_actions.grid(row=6, column=0, columnspan=3, sticky="ew",
+        sec_actions.grid(row=7, column=0, columnspan=3, sticky="ew",
                          padx=10, pady=(8, 4))
         sec_actions.columnconfigure(0, weight=1)
         sec_actions.columnconfigure(1, weight=1)
@@ -357,9 +378,9 @@ class EpubBuilderGUI(tk.Tk):
 
         # ─── Section: Log ───
         sec_log = ttk.LabelFrame(f, text="Log", padding=6)
-        sec_log.grid(row=7, column=0, columnspan=3, sticky="nsew",
+        sec_log.grid(row=8, column=0, columnspan=3, sticky="nsew",
                      padx=10, pady=(4, 10))
-        f.rowconfigure(7, weight=1)
+        f.rowconfigure(8, weight=1)
         sec_log.rowconfigure(0, weight=1)
         sec_log.columnconfigure(0, weight=1)
 
@@ -518,6 +539,40 @@ class EpubBuilderGUI(tk.Tk):
             self._log(f"Chapter removed: \"{name}\"")
         self._sync_chapter_json()
 
+    def _import_chapter_json(self) -> None:
+        """Import chapter data from a JSON file and populate the table."""
+        path = filedialog.askopenfilename(
+            title="Import chapters from JSON",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            parent=self,
+        )
+        if not path:
+            return
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except Exception as e:
+            messagebox.showerror("Import Error",
+                                 f"Failed to read JSON file:\n{e}")
+            return
+        if not isinstance(data, dict):
+            messagebox.showerror("Import Error",
+                                 "JSON must be an object: {\"Name\": page, ...}")
+            return
+        # Clear existing rows
+        for item in self._ch_tree.get_children():
+            self._ch_tree.delete(item)
+        # Populate
+        count = 0
+        for name, page in sorted(data.items(), key=lambda kv: kv[1]):
+            if isinstance(name, str) and isinstance(page, int) and page >= 1:
+                self._ch_tree.insert("", tk.END, values=(name, str(page)))
+                count += 1
+            else:
+                logger.warning("Skipped invalid entry: %s → %s", name, page)
+        self._sync_chapter_json()
+        self._log(f"Imported {count} chapters from {Path(path).name}")
+        messagebox.showinfo("Import", f"Imported {count} chapters.")
+
     def _clear_chapter_table(self) -> None:
         """Remove all rows from the table."""
         if not self._ch_tree.get_children():
@@ -534,11 +589,79 @@ class EpubBuilderGUI(tk.Tk):
         self.log_text.delete("1.0", tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
+    # ─────────────────────────────────────────
+    #  Settings persistence
+    # ─────────────────────────────────────────
+
+    def _save_settings(self) -> None:
+        """Save current GUI state to a JSON file so it's restored on next launch."""
+        # Collect chapter table data
+        chapters = []
+        for child in self._ch_tree.get_children():
+            name, page = self._ch_tree.item(child, "values")
+            chapters.append({"name": name, "page": int(page)})
+
+        settings = {
+            "src": self.src_picker.get(),
+            "dst": self.dst_picker.get(),
+            "title": self.title_entry.get(),
+            "author": self.author_entry.get(),
+            "publisher": self.publisher_entry.get(),
+            "lang": self.lang_combo.get(),
+            "progression": self.progression_var.get(),
+            "normalize": self.normalize_cb.get(),
+            "quality": self.quality_var.get(),
+            "chapter_mode": self._ch_mode_var.get(),
+            "chapters": chapters,
+            "pack": self.pack_cb.get(),
+            "compress": self.compress_cb.get(),
+            "pack_name": self.pack_name_entry.get(),
+        }
+        try:
+            self.SETTINGS_FILE.write_text(
+                json.dumps(settings, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.debug("Failed to save settings: %s", e)
+
+    def _load_settings(self) -> None:
+        """Restore GUI state from the settings file if it exists."""
+        if not self.SETTINGS_FILE.exists():
+            return
+        try:
+            data = json.loads(self.SETTINGS_FILE.read_text(encoding="utf-8"))
+            self.src_picker.set(data.get("src", ""))
+            self.dst_picker.set(data.get("dst", ""))
+            self.title_entry.set(data.get("title", ""))
+            self.author_entry.set(data.get("author", ""))
+            self.publisher_entry.set(data.get("publisher", ""))
+            self.lang_combo.set(data.get("lang", "ja"))
+            self.progression_var.set(data.get("progression", "rtl"))
+            self.normalize_cb.var.set(data.get("normalize", True))
+            self.quality_var.set(data.get("quality", 85))
+            self._on_quality_change()
+            self._ch_mode_var.set(data.get("chapter_mode",
+                                           "① Custom table (chapters → pages)"))
+            self.pack_cb.var.set(data.get("pack", True))
+            self.compress_cb.var.set(data.get("compress", False))
+            self.pack_name_entry.set(data.get("pack_name", ""))
+            # Restore chapter table
+            for ch in data.get("chapters", []):
+                self._ch_tree.insert("", tk.END,
+                                     values=(ch["name"], str(ch["page"])))
+            self._sync_chapter_json()
+            self._on_chapter_mode_change()
+            logger.info("Settings restored from %s", self.SETTINGS_FILE)
+        except Exception as e:
+            logger.debug("Failed to load settings: %s", e)
+
     def _on_close(self) -> None:
         if self._running:
             if not messagebox.askokcancel(
                     "Quit", "A build is in progress. Quit anyway?"):
                 return
+        self._save_settings()
         self.destroy()
 
     # ─────────────────────────────────────────
@@ -584,9 +707,11 @@ class EpubBuilderGUI(tk.Tk):
             chapters = None
             no_chapters = True
 
-        # ── Disable UI ──
+        # ── Disable UI & start progress ──
         self._running = True
         self.build_btn.configure(state=tk.DISABLED, text="⏳ Building…")
+        self.progress_bar.start(15)
+        self.progress_label.configure(text="Building EPUB…", foreground="#ffcc00")
 
         # ── Run in background thread ──
         args = {
@@ -638,7 +763,7 @@ class EpubBuilderGUI(tk.Tk):
                 # Remove extension if user included it
                 stem = stem.removesuffix(".epub")
                 epub_path = Path(args["dst"]).resolve() / f"{stem}.epub"
-                pack_epub(out_dir, epub_path, no_compress=not compress)
+                pack_epub(out_dir, epub_path, compress=compress)
                 size_mb = epub_path.stat().st_size / (1024 * 1024)
                 self._log(f"📦 Packed → {epub_path}  ({size_mb:.1f} MB)")
                 self._log(f"   Compression: {'ZIP_DEFLATED' if compress else 'ZIP_STORED (none)'}")
@@ -659,6 +784,8 @@ class EpubBuilderGUI(tk.Tk):
         """Re-enable UI after build completes."""
         self._running = False
         self.build_btn.configure(state=tk.NORMAL, text="🚀  Build EPUB")
+        self.progress_bar.stop()
+        self.progress_label.configure(text="Done ✓", foreground="#4ec94e")
 
 
 # ═══════════════════════════════════════════

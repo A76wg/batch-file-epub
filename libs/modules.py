@@ -124,13 +124,15 @@ def convert_and_copy_images(src_images: list[Path], dst_dir: Path,
     for idx, src in enumerate(src_images, start=1):
         page_n = f"{idx:03d}"
         dst = dst_dir / f"i-{page_n}.jpeg"
-        _to_jpeg(src, dst)
+        _to_jpeg(src, dst, quality=encode_quality)
     return len(src_images)
 
 
-def _to_jpeg(src: Path, dst: Path) -> None:
-    """Copy *src* to *dst* as .jpeg (keeps original encoding, iBooks handles it)."""
-    shutil.copy2(src, dst)
+def _to_jpeg(src: Path, dst: Path, quality: int = 85) -> None:
+    """Convert *src* to a true JPEG at *dst* using Pillow (avoids format mismatch)."""
+    from PIL import Image
+    img = Image.open(src).convert("RGB")
+    img.save(dst, "JPEG", quality=quality, optimize=True)
 
 
 # ═══════════════════════════════════════════
